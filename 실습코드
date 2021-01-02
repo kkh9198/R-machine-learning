@@ -1,0 +1,70 @@
+install.packages("tidyverse")
+install.packages("car")
+library(tidyverse)
+library(car)
+
+getwd()
+list.files()
+
+df<-read.csv(file='http://bit.ly/used_cars_price')
+str(object = df)
+df<-df%>%
+  filter(HP<=120 & Weight<=1200  & Doors>=3)%>%
+  select(-CC)%>%
+  filter(FuelType %in% c('Diesel','Petrol'))%>%
+  mutate(FuelType =factor(x=FuelType),
+         Automatic =factor(x=Automatic),
+         MetColor =factor(x=MetColor),
+         )
+
+table(df$FuelType) ##개수 세주기
+summary(df)
+
+
+#정규분포 확인하는 법
+shapiro.test(df$Price)
+
+
+
+
+n<-nrow(df)
+
+set.seed(seed=1234)
+index<-sample(n,size=n*0.7,replace=TRUE)
+
+
+trainSet <- df%>% slice(index)
+testSet <- df%>% slice(-index)
+
+mean(trainSet$Price)
+mean(testSet$Price)
+
+
+fit<-lm(Price~Age, trainSet)
+
+summary(fit)
+
+par(mfrow = c(2, 2))
+plot(x = fit)
+
+par(mfrow = c(1, 1))
+
+hist(x = fit$residuals)
+shapiro.test(x = fit$residuals)
+
+ncvTest(model = fit)
+durbinWatsonTest(model = fit)
+crPlots(model = fit)
+influencePlot(model = fit)
+
+real <- testSet$Price
+print(x = real)
+
+pred1 <- predict(object = fit, newdata = testSet)
+print(x = pred1)
+install.packages("MLmetrics")
+library(MLmetrics)
+MSE(y_pred = pred1, y_true = real)
+RMSE(y_pred = pred1, y_true = real)
+MAE(y_pred = pred1, y_true = real)
+MAPE(y_pred = pred1, y_true = real)
