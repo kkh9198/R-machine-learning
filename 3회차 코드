@@ -1,0 +1,153 @@
+install.packages("kknn")
+install.packages("e1071")
+install.packages("DMwR")
+library(tidyverse)
+library(kknn)
+library(caret)
+library(MLmetrics)
+library(e1071)
+library(pROC)
+library(DMwR)
+getwd()
+list.files()
+cust<-readRDS('Dataset for Cust.RDS')
+str(cust)
+#RDS=r객체를 1개만 저장할 수 있다.
+#장점1.데이터 형식을 유지한다. 
+#    2.저장 용량이  매우 작다.
+
+dist(cust)
+#각각의 거리를 계산해 준다.  
+
+scaled<-scale(cust)
+summary(scaled)
+
+
+dist(scaled)
+#입력 변수들이 정규분포를 따르고 데이터 척도가 다르다면 '표준화'를 진행해주어야 한다. 
+set.seed(seed=1234)
+heights<-rnorm(1000,172.4,5.7)
+scaled1<-scale(heights)
+mean(scaled1)
+sd(scaled1)
+range(scaled1)
+
+
+Min<-min(heights)
+Max<-max(heights)
+scaled2<-scale(heights,Min,Max-Min)
+mean(scaled2)
+sd(scaled2)
+range(scaled2)
+
+url<-'https://bit.ly/white_wine_quality'
+guess_encoding(url)
+df<-read.csv(url,sep=';')
+head(df,10)
+str(df)
+summary(df)
+
+tbl<-table(df$quality)
+print(tbl)
+tbl %>% prop.table() %>% cumsum() %>% round(4)*100
+
+bp<-barplot(height=tbl,ylim=c(0,2400),xlab='Quality',
+        main='White Wine')
+
+text(x=bp,y=tbl,labels=tbl,pos=3,col='blue',font=3)
+
+
+df$grade<-ifelse(df$quality>=7,'best','good')
+df$grade<-factor(df$grade,c('good','best'))
+print(df$grade)
+df
+df$quality<-NULL
+
+n<-nrow(df)
+set.seed(1234)
+index<-sample(n,n*0.7,FALSE)
+trainSet<-df %>%  slice(index)
+testSet<-df %>%  slice(-index)
+
+trainSet$grade %>%  table() %>%  prop.table() %>%  round(4)*100
+testSet$grade %>%  table() %>%  prop.table() %>%  round(4)*100
+
+k<-trainSet %>% nrow() %>%  sqrt() %>%  ceiling()
+fit1<-kknn(grade~ .,
+           train=trainSet,
+           test=testSet,
+           k=k,
+           kernel='rectangular')
+str(fit1)
+
+head(fit1$CL)
+
+real<-testSet$grade
+pred1<-fit1$fitted.values
+
+table(pred1,real)
+
+confusionMatrix(pred1,real,'best')
+
+F1_Score(real,pred1,'best')
+
+prob1<-fit1$prob[,2]
+roc(real,prob1) %>% 
+  plot(main='ROC curve',col='red')
+auc(real,prob1)
+
+set.seed(1234)
+
+trainBal<-SMOTE(form= grade~ .,
+                data=trainSet,
+                perc.over = 200,
+                k=5,
+                perc.under=150)
+trainBal$grade %>%  table() %>% prop.table() %>% 
+  round(4)*100
+
+fit2<-kknn(formula=grade~.,
+           train=trainBal,
+           test=testSet,
+           k=k,
+           kernel = 'rectangular')
+
+pred2<-fit2$fitted.values
+table(pred2,real)
+
+confusionMatrix(pred2,real,'best')
+confusionMatrix(pred1,real,'best')
+
+
+F1_Score(real,pred1,'best')
+F1_Score(real,pred2,'best')
+
+prob2<-fit2$prob[,2]
+
+roc(real,prob2) %>% plot(col='blue',add=TRUE)
+
+auc(real,prob2)
+auc(real,prob1)
+
+
+fit3<-kknn(grade~.,
+           trainBal,
+           testSet,
+           k=k,
+           'triangular')
+
+pred3<-fit3$fitted.values
+
+table(pred3,real)
+table(pred2,real)
+
+confusionMatrix(pred3,real,'best')
+confusionMatrix(pred2,real,'best')
+
+
+F1_Score(real,pred2,'best')
+F1_Score(real,pred3,'best')
+
+prob3<-fit3$prob[,2]
+roc(real,prob3) %>% plot(col='purple',lty=3,add=TRUE)
+auc(real)
