@@ -1,0 +1,40 @@
+library(tidyverse)
+library(rpart)
+install.packages("rpart.plot")
+library(rpart.plot)
+url<-'https://bit.ly/universal_bank'
+
+
+df<-read.csv(url)
+
+str(df)
+summary(df)
+
+head(df,10)
+
+df<-df%>% select(-ID,-ZIP.Code)%>%filter(Experience>=0)
+cols<-c(6,8:12)
+df[,c(6,8:12)]<-map_df(df[,c(6,8:12)],as.factor)
+str(df)
+summary(df)
+
+df$PersonalLoan %>% table() %>%  prop.table( )  %>% round(4)*100
+n<-nrow(df)
+set.seed(1234)
+index<-sample(n,n*0.7)
+trainSet<-df %>% slice(index)
+testSet<-df %>% slice(-index)
+
+trainSet$PersonalLoan %>%  table() %>% prop.table() %>% round(4)*100
+testSet$PersonalLoan %>%  table() %>% prop.table() %>% round(4)*100
+
+ctrl<-rpart.control(minsplit = 20,cp=0.01,maxdepth = 10)
+set.seed(1234)
+fit1<-rpart(formula=PersonalLoan~.,
+            data=trainSet,
+            control=ctrl
+            )
+
+rpart.plot()
+summary(fit1)
+##현업에서 이상치 발견시  
