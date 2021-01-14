@@ -38,3 +38,57 @@ fit1<-rpart(formula=PersonalLoan~.,
 rpart.plot()
 summary(fit1)
 ##현업에서 이상치 발견시  
+
+printcp(fit1)
+plotcp(fit1)
+
+
+
+#항상 같은값을 얻으려면 셋시드해야댐
+ctrl<-rpart.control(minsplit = 10,cp=0.001,maxdepth = 30)
+set.seed(1234)
+fit1<-rpart(formula=PersonalLoan~.,
+            data=trainSet,
+            control=ctrl
+)
+printcp(fit1)
+plotcp(fit1)
+
+fit2<-prune.rpart(fit1,cp=0.0098)
+printcp(fit2)
+plotcp(fit2)
+
+
+rpart.plot(fit2)
+
+
+real<-testSet$PersonalLoan
+pred1<-predict(fit1,testSet,'class')
+pred2<-predict(fit2,testSet,'class')
+
+table(pred1,real)
+table(pred2,real)
+
+library(caret)
+confusionMatrix(pred1, real,'1')
+confusionMatrix(pred2, real,'1')
+
+library(MLmetrics)
+F1_Score(real, pred1,'1')
+F1_Score(real, pred2,'1')
+
+prob1<-predict(fit1,testSet,'prob')[,2]
+prob2<-predict(fit2,testSet,'prob')[,2]
+
+library(pROC)
+roc(real,prob1) %>% plot(main='ROC curve',col='red',lty=1)
+roc(real,prob2) %>% plot(col='blue',lty=2,add=TRUE)
+
+
+auc(real,prob1)
+auc(real,prob2)
+
+saveRDS(fit2,'DecisionTree.RDS')
+
+
+
