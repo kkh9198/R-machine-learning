@@ -1,0 +1,129 @@
+library(tidyverse)
+
+
+url<-('https://bit.ly/median_house_value')
+df<-read.csv(url)
+str(df)
+summary(df)
+
+
+range(df$MedianHouseValue)
+breaks<-seq(0,510000,10000)
+hist(df$MedianHouseValue,breaks = breaks)
+
+
+df<-df %>% filter(MedianHouseValue<500000)
+
+
+n<-nrow(df)
+
+set.seed(1234)
+index<-sample(n,n*0.3)
+trainSet<-df %>% slice(index)
+testSet<-df %>% slice(-index)
+
+
+mean(trainSet$MedianHouseValue)
+mean(testSet$MedianHouseValue)
+
+save(list=c('df','trainSet','testSet'),file='house_dataset.RDA')
+
+ctrl<-rpart.control(minsplit = 20,
+                    cp=0.01,
+                    maxdepth = 10)
+
+set.seed(1234)
+fit1<-rpart(formula=MedianHouseValue~.,
+            data=trainSet,
+            control = ctrl)
+printcp(fit1)
+plotcp(fit1)
+
+
+
+ctrl<-rpart.control(minsplit = 10,
+                    cp=0.001,
+                    maxdepth = 30)
+
+set.seed(1234)
+fit1<-rpart(formula=MedianHouseValue~.,
+            data=trainSet,
+            control = ctrl)
+printcp(fit1)
+plotcp(fit1)
+
+##xerror만 벡터로 선택
+str(fit1)
+fit1$cptable[,4]
+which.min(fit1$cptable[,4])
+#cp만 벡터로 선택
+cp<-fit1$cptable[76,1]
+
+fit2<-prune.rpart(fit1,cp)
+
+summary(fit1)
+real<-testSet$MedianHouseValue
+
+pred1<-predict(fit1,testSet,type='vector')
+pred2<-predict(fit2,testSet,type='vector')
+
+#회귀모형의 성능 평가하는 사용자 정의 함수 생성
+regMeasure<-function(pred,real){
+  library(MLmetrics)
+  result<-data.frame(
+  MSE=MSE(pred,real),
+  RMSE=RMSE(pred,real),
+  MAE=MAE(pred,real),
+  MAPE=MAPE(pred,real)
+  )
+  return(result)
+}
+
+
+regMeasure(pred1,real)
+regMeasure(pred2,real)
+
+#선형 회귀모형 프로세스
+#목표편수가 정규분포를 따르는지 확인!
+#히스토그램 그려서 보는 것도 방법!
+#목표변수와 입력변수 간 상관성 분석 : 피어슨 상관분석
+#정규분포해야  피어슨 상관분석가능
+#비모수적 기법으로 상관관계를 보려면 스피어만 상관분석
+
+
+test<-cor.test(df$MedianIncome,df$MedianHouseValue,)
+str(test)
+test<-cor.test(df$MedianIncome,df$MedianHouseValue,)
+test<-cor.test(df$MedianIncome,df$MedianHouseValue,)
+
+
+
+locs<-map_lgl(.x=df,.f=function(x){
+  test<-cor.test(x,df$MedianHouseValue)
+  result<-test$p.value>0.05
+  return(result)
+})
+#'x'인자의 true 인덱스 반환
+which(locs)
+
+
+full<-lm(MedianHouseValue~.,  data=trainSet1)
+fit2<-step(full,direction = 'both')
+summary(fit2)
+
+#다중공선성(10넘어가면 문제있음)가장큰것부터 지운다. 
+# 10 넘어가는게 없을때까지
+library(car)
+vif(fit2)
+
+trainSet1<-trainSet %>%  select(-TotalBedrooms)
+
+
+full<-lm(MedianHouseValue~.,  data=trainSet1)
+fit2<-step(full,direction = 'both')
+
+trainSet1<-trainSet1 %>%  select(-Households)
+library(reghelper)
+
+beta(model=fit2)
+
