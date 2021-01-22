@@ -1,0 +1,101 @@
+library(tidyverse)
+list.files()
+load("Bank_DataSet.RDA")
+install.packages("gbm")
+library(gbm)
+##범주형과 이항형은 목표변수의 분포가 다르다. 
+parallel::detectCores()
+set.seed(1234)
+fit1<-gbm(
+  formula = PersonalLoan~.,
+  data=trainSet,
+  distribution = 'multinomial',
+  n.trees = 5000,
+  interaction.depth = 3,
+  shrinkage = 0.01,
+  n.minobsinnode = 10,
+  bag.fraction = 0.5,
+  cv.folds = 5,
+  n.cores = 3,
+  verbose = TRUE
+)
+
+print(fit1)
+##n.trees에 결과값넣어준다.
+par(mar=c(5,8,4,2))
+summary(fit1,las=2)
+title(main='Variable Importance')
+##dev.off()오른쪽 아래창 다 지워짐
+
+##최적의 부스팅횟수 알아내는 법
+gbm.perf(fit1,method = 'cv')
+
+real<-testSet$PersonalLoan
+prob1<-predict(fit1,testSet,type='response')
+head(prob1)
+##출력값에 , ,1543 <-3차원배열
+prob1<-prob1[,2,1]
+
+boxplot(formula=prob1~real)
+
+pred1<-ifelse(prob1>=0.5,'1','0') %>% as.factor()
+head(pred1)
+
+list.files()
+
+
+library(caret)
+confusionMatrix(pred1,real,positive = '1')
+list.files()
+bestRF <- readRDS(file = 'RandomForest.RDS')
+
+
+
+class(x = bestRF)
+library(randomForest)
+pred0 <- predict(object = bestRF, newdata = testSet, type = 'response')
+prob0 <- predict(object = bestRF, newdata = testSet, type = 'vote')[, 2]
+
+library(caret)
+confusionMatrix(data = pred0, reference = real, positive = '1')
+confusionMatrix(data = pred1, reference = real, positive = '1')
+
+library(MLmetrics)
+F1_Score(y_true = real, y_pred = pred0, positive = '1')
+F1_Score(y_true = real, y_pred = pred1, positive = '1')
+
+library(pROC)
+roc(response = real, predictor = prob0) %>% 
+  plot(col = 'red', lty = 1)
+
+roc(response = real, predictor = prob1) %>% 
+  plot(col = 'blue', lty = 2, add = TRUE)
+
+auc(response = real, predictor = prob0)
+auc(response = real, predictor = prob1)
+
+
+grid<-expand.grid(depth=c(1,3,5),
+                  learn = c(0.01,0.05,0.1),
+                  min=c(5,7,10),
+                  bag=c(0.5,0.7,1.0),
+                  verr=NA,
+                  tree=NA)
+
+nn <- nrow(x = grid)
+for(ii in 1:nn) {
+  cat(str_glue('현재 {ii}행 실행 중!'), '\n')
+  set.seed(seed = 1234)
+  fit <- gbm(formula = PersonalLoan ~ ., 
+             data = trainSet, 
+             distribution = 'multinomial', 
+             n.trees = 5000, 
+             interaction.depth = grid$depth[ii], 
+             shrinkage = grid$learn[ii], 
+             n.minobsinnode = grid$min[ii], 
+             bag.fraction = grid$bag[ii],
+             train.fraction = 0.75,
+             n.cores = NULL)
+  grid$verr[ii] <- min(fit$valid.error)
+  grid$tree[ii] <- which.min(x = fit$valid.error)
+}
